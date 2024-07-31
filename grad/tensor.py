@@ -3,7 +3,17 @@ from variable import Variable
 
 class Tensor:
   def __init__(self, data):
-      self.data = self._convert_to_variable(data)
+    self.data = self._convert_to_variable(data)
+    
+  @staticmethod
+  def zeros(shape):
+    def recursive_zeros(shape):
+      if len(shape) == 1:
+        return [Variable(0.) for _ in range(shape[0])]
+      else:
+        return [recursive_zeros(shape[1:]) for _ in range(shape[0])]
+
+    return Tensor(recursive_zeros(shape))
 
   def _convert_to_variable(self, item):
     if isinstance(item, list):
@@ -21,7 +31,18 @@ class Tensor:
       elif isinstance(item, Variable):
         item.backward()
     _backward(self.data)
+    
+  def get_shape(self):
+    dimensions = []
+    
+    def get_dim(sub_list):
+      if isinstance(sub_list, list):
+        dimensions.append(len(sub_list))
+        get_dim(sub_list[0])
         
+    get_dim(self.data)
+    return dimensions
+    
   def _apply_operation(self, x, y, op):
     if isinstance(x, list) and isinstance(y, list):
       return [self._apply_operation(sub_x, sub_y, op) for sub_x, sub_y in zip(x, y)]
@@ -56,9 +77,30 @@ class Tensor:
   def __repr__(self):
     return f"Tensor(data={self.data})"
   
+  # List operations
+  def __getitem__(self, index):
+    return Tensor(self.data[index])
+
+  def __iter__(self):
+    for sub in self.data:
+      if isinstance(sub, list):
+        yield Tensor(sub)
+      else:
+        yield sub
+  
   # Dot product
-  def dot(other):
-    pass
+  def dot(self, other):
+    if not isinstance(other, Tensor):
+      raise ValueError("The dot product requires another Tensor")
+    
+    if len(self.data) != len(other.data):
+        raise ValueError("Both Tensors must have the same length")
+
+    product_sum = Variable(0)
+    for a, b in zip(self.data, other.data):
+      product_sum += a * b
+    
+    return product_sum
   
   # Reshaping operations
   def flatten(self, data):
