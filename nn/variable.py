@@ -59,7 +59,7 @@ class Variable:
     
     return out
   
-  def relu(self):
+  def relu(self, other=None):
     out = Variable(0 if self.data < 0 else self.data, [self])
     
     def _backward():

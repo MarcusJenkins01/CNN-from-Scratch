@@ -45,8 +45,11 @@ class Tensor:
     return dimensions
     
   def _apply_operation(self, x, y, op):
-    if isinstance(x, list) and isinstance(y, list):
-      return [self._apply_operation(sub_x, sub_y, op) for sub_x, sub_y in zip(x, y)]
+    if isinstance(x, list) and (y is None or isinstance(y, list)):
+      if isinstance(y, list):
+        return [self._apply_operation(sub_x, sub_y, op) for sub_x, sub_y in zip(x, y)]
+      else:
+        return [self._apply_operation(sub_x, None, op) for sub_x in x]
     else:
       return op(x, y)
 
@@ -57,7 +60,7 @@ class Tensor:
     else:
       return Tensor([self._apply_operation(x, other, operation) for x in self.data])
 
-  def relu(self):
+  def relu(self, other=None):
     return self._elementwise_operation(None, Variable.relu)
   
   def __add__(self, other):

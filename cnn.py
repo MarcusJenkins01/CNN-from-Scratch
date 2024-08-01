@@ -13,10 +13,10 @@ class CNN:
   
   def forward(self, x):
     batch_size, *_ = x.get_shape()
-    out = self.conv1(x)
-    out = self.conv2(out)
-    out = self.conv3(out)
-    out = self.conv4(out)
+    out = self.conv1(x).relu()
+    out = self.conv2(out).relu()
+    out = self.conv3(out).relu()
+    out = self.conv4(out).relu()
     out = self.conv5(out)
     out = out.reshape((batch_size, self.n_classes))
     return out
