@@ -14,7 +14,9 @@ Features:
 * Element-wise and matrix operations for tensors, including ReLU activation function.
 * The ConvolutionalLayer2d which implements a convolutional layer using the Tensor operations.
 
-## Application
-The cnn.py file includes an example architecture for image classification with the MNIST dataset.
+## Implementation detail
+The ConvolutionalLayer2d uses the GEMM method to obtain the dot product of each filter for each patch as a single matrix operation.
+![image](https://github.com/user-attachments/assets/5ba05129-5ab2-4c8f-8f66-9c46d6b0757a)
+![image](https://github.com/user-attachments/assets/ec61355a-4b42-4ca1-a4c8-034210246d62)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
