@@ -3,8 +3,8 @@ import numpy as np
 
 class Variable:
   def __init__(self, data, _children=(), _backward=lambda: None):
-    self.data = np.array(data) if not isinstance(data, np.ndarray) else data
-    self.grad = np.zeros_like(self.data)
+    self.data = data
+    self.grad = 0.
     self._backward = _backward
     self._descendents = set(_children)
     
@@ -31,21 +31,23 @@ class Variable:
     return out
 
   def backward(self):
-    graph = []
-    visited = set()
+    from collections import deque
+    in_degree = {}
+    for node in self._descendents:
+      in_degree[node] = in_degree.get(node, 0) + 1
     
-    def build_graph(node):
-      if node not in visited:
-        visited.add(node)
-        for child in node._descendents:
-          build_graph(child)
-        graph.append(node)
-    build_graph(self)
-    
-    print(graph)
+    queue = deque([v for v in self._descendents if in_degree.get(v, 0) == 0])
+    result = []
+    while queue:
+      node = queue.popleft()
+      result.append(node)
+      for successor in node._descendents:
+        in_degree[successor] -= 1
+        if in_degree[successor] == 0:
+          queue.append(successor)
     
     self.grad = np.array(1.0)
-    for node in reversed(graph):
+    for node in reversed(result):
       node._backward()
   
   def __pow__(self, other):

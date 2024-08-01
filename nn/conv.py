@@ -64,7 +64,7 @@ class ConvolutionalLayer2d:
     # Perform convolution by matrix multiplication
     for bi in range(batch_size):
       batch_patches = im2col_matrix[bi].transpose()
-      conv_results = self.filters.matmul(batch_patches)
+      conv_results = self.filters.matmul2d(batch_patches)
 
       # Place results back into the output tensor
       for fi in range(self.out_channels):

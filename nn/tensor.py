@@ -89,69 +89,48 @@ class Tensor:
       else:
         yield sub
   
-  # Dot product
-  def dot(self, other):
-    if not isinstance(other, Tensor):
-      raise ValueError("Dot product requires another Tensor")
-
-    # Flatten the Tensors and extract only the data for dot product
-    flat_self = self.flatten()
-    flat_other = other.flatten()
-    data_self = np.array([var.data for var in flat_self])
-    data_other = np.array([var.data for var in flat_other])
-
-    # Perform dot product using numpy for efficiency
-    result_array = np.dot(data_self, data_other)
-
-    # Create Variables for each result and setup the backward function
-    def make_variable(result, i, j):
-      var = Variable(result, flat_self + flat_other)
-
-      def _backward():
-        grad_output = var.grad
-        flat_self[i].grad += grad_output * data_other[j]
-        flat_other[j].grad += grad_output * data_self[i]
-
-      var._backward = _backward
-      return var
-
-    # Resultant tensor from the dot product
-    result_vars = [make_variable(result_array[i][j], i, j) for i in range(len(flat_self)) for j in range(len(flat_other))]
-    result_tensor = Tensor(result_vars)
-
-    return result_tensor
-  
-  def matmul(self, other):
+  def matmul2d(self, other):
     if not isinstance(other, Tensor):
       raise ValueError("Matrix multiplication requires another Tensor")
 
-    # Flatten tensors to calculate matrix multiplication on the last dimensions
     self_shape = self.get_shape()
     other_shape = other.get_shape()
     if self_shape[-1] != other_shape[-2]:
-      raise ValueError("Last dimension of 'self' must match second to last dimension of 'other' for matmul")
+      raise ValueError("Incompatible dimensions for matrix multiplication")
 
     # Prepare arrays for multiplication
     self_flat = self.flatten()
     other_flat = other.flatten()
-    self_array = np.array(self_flat)
-    other_array = np.array(other_flat)
+    self_array_flat = np.array([v.data for v in self_flat])
+    other_array_flat = np.array([v.data for v in other_flat])
+    self_array = self_array_flat.reshape(self_shape)
+    other_array = other_array_flat.reshape(other_shape)
 
     # Compute result using numpy for the forward pass
-    result = np.matmul(self_array.reshape(self_shape), other_array.reshape(other_shape))
-    result_tensor = Tensor([[Variable(x, self_flat + other_flat) for x in row] for row in result])
+    result_array = np.matmul(self_array, other_array)
 
-    # Setup backward function to compute gradients of the dot product
-    def _backward():
-      self_grad = np.matmul(result.grad, other_array.T)
-      other_grad = np.matmul(self_array.T, result.grad)
-      for i in range(len(self.flatten())):
-        self.flatten()[i].grad += self_grad.flatten()[i]
-      for i in range(len(other.flatten())):
-        other.flatten()[i].grad += other_grad.flatten()[i]
+    def build_variable(i, j):
+      # Track which variables were used to create each output in the result array
+      row_indices = range(i * self_shape[-1], (i + 1) * self_shape[-1])
+      col_indices = range(j, len(other_flat), other_shape[-1])
+      children = [self_flat[r] for r in row_indices] + [other_flat[c] for c in col_indices]
+      
+      # Convert to Variable
+      var = Variable(result_array[i, j], _children=children)
+      
+      # Define backward for the variable, based on matrix multiplication
+      def _backward():
+        grad_output = var.grad
+        for k in range(self_shape[-1]):
+          children[k].grad += grad_output * other_array[k, j]
+        for k in range(other_shape[-2]):
+          children[self_shape[-1] + k].grad += grad_output * self_array[i, k]
 
-    result_tensor._backward = _backward
+      var._backward = _backward
+      return var
 
+    result_tensor = Tensor([[build_variable(i, j) for j in range(result_array.shape[1])]
+                            for i in range(result_array.shape[0])])
     return result_tensor
   
   # Reshaping operations
