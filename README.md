@@ -6,7 +6,7 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
-This project implements a convolutional neural network (CNN) for image classification from scratch, using only pure Python with no external dependencies. This demonstrates how CNNs work on a low level for educational purposes.
+This project implements a convolutional neural network (CNN) for image classification from scratch, using only pure Python and numpy (for matrix operations). This demonstrates how CNNs work on a low level for educational purposes.
     
 Features:
 * The Variable class for tracking of gradients and back-propagation.
@@ -15,6 +15,6 @@ Features:
 * The ConvolutionalLayer2d which implements a convolutional layer using the Tensor operations.
 
 ## Application
-The demos folder includes some example architectures for image classification.
+The cnn.py file includes an example architecture for image classification with the MNIST dataset.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
