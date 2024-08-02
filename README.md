@@ -6,7 +6,7 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
-This project implements a convolutional neural network (CNN) for image classification from scratch, using only pure Python and numpy (for matrix operations). This demonstrates how CNNs work on a low level for educational purposes.
+This project implements a convolutional neural network (CNN) for image classification from scratch, using only pure Python. This demonstrates how CNNs work on a low level for educational purposes.
     
 Features:
 * The Variable class for tracking of gradients and back-propagation.
