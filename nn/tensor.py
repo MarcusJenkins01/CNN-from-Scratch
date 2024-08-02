@@ -1,5 +1,4 @@
 from .variable import Variable
-import numpy as np
 
 
 class Tensor:
@@ -17,7 +16,9 @@ class Tensor:
     return Tensor(recursive_zeros(shape))
 
   def _convert_to_variable(self, item):
-    if isinstance(item, list):
+    if isinstance(item, Tensor):
+      return item.data
+    elif isinstance(item, list):
       return [self._convert_to_variable(sub_item) for sub_item in item]
     elif not isinstance(item, Variable):
       return Variable(item)
@@ -25,13 +26,9 @@ class Tensor:
   
   def backward(self):
     """Performs the backward pass for all Variables nested within the tensor"""
-    def _backward(item):
-      if isinstance(item, list):
-        for sub_item in item:
-          _backward(sub_item)
-      elif isinstance(item, Variable):
-        item.backward()
-    _backward(self.data)
+    flat_data = self.flatten()
+    for var in flat_data:
+      var.backward()
     
   def get_shape(self):
     dimensions = []
@@ -45,23 +42,44 @@ class Tensor:
     return dimensions
     
   def _apply_operation(self, x, y, op):
-    if isinstance(x, list) and (y is None or isinstance(y, list)):
-      if isinstance(y, list):
-        return [self._apply_operation(sub_x, sub_y, op) for sub_x, sub_y in zip(x, y)]
-      else:
+    if isinstance(x, list):
+      if y is None:
         return [self._apply_operation(sub_x, None, op) for sub_x in x]
+      else:
+        return [self._apply_operation(sub_x, sub_y, op) for sub_x, sub_y in zip(x, y)]
     else:
-      return op(x, y)
+      if y is None:
+        return op(x)
+      else:
+        return op(x, y)
 
   # Element-wise operations
   def _elementwise_operation(self, other, operation):
+    original_shape = self.get_shape()
+    
     if isinstance(other, Tensor):
-      return Tensor(self._apply_operation(self.data, other.data, operation))
+      result_data = self._apply_operation(self.data, other.data, operation)
+    elif other is None:
+      result_data = self._apply_operation(self.data, None, operation)
     else:
-      return Tensor([self._apply_operation(x, other, operation) for x in self.data])
+      result_data = [self._apply_operation(x, other, operation) for x in self.data]
+
+    result_tensor = Tensor(result_data)
+    return result_tensor.reshape(original_shape)
 
   def relu(self, other=None):
     return self._elementwise_operation(None, Variable.relu)
+  
+  def softmax(self):
+    original_shape = self.get_shape()
+    data_flat = self.flatten()
+    
+    max_var = max(data_flat, key=lambda x: x.data)
+    exps = [(v - max_var).exp() for v in data_flat]
+    sum_of_exps = sum(exps)
+    
+    softmax_output = [x / sum_of_exps for x in exps]
+    return Tensor(softmax_output).reshape(original_shape)
   
   def __add__(self, other):
     return self._elementwise_operation(other, Variable.__add__)
@@ -83,58 +101,42 @@ class Tensor:
   
   # List operations
   def __getitem__(self, index):
-    return Tensor(self.data[index])
+    sub = self.data[index]
+    if isinstance(sub, list):
+      return Tensor(sub)
+    else:
+      return sub
 
   def __iter__(self):
     for sub in self.data:
-      if isinstance(sub, list):
-        yield Tensor(sub)
-      else:
-        yield sub
+      yield Tensor(sub)
   
+  def __len__(self):
+    return len(self.data)
+  
+  # Matrix multiplication
   def matmul2d(self, other):
     if not isinstance(other, Tensor):
       raise ValueError("Matrix multiplication requires another Tensor")
 
     self_shape = self.get_shape()
     other_shape = other.get_shape()
-    if self_shape[-1] != other_shape[-2]:
+    if self_shape[-1] != other_shape[0]:
       raise ValueError("Incompatible dimensions for matrix multiplication")
 
-    # Prepare arrays for multiplication
-    self_flat = self.flatten()
-    other_flat = other.flatten()
-    self_array_flat = np.array([v.data for v in self_flat])
-    other_array_flat = np.array([v.data for v in other_flat])
-    self_array = self_array_flat.reshape(self_shape)
-    other_array = other_array_flat.reshape(other_shape)
-
-    # Compute result using numpy for the forward pass
-    result_array = np.matmul(self_array, other_array)
-
-    def build_variable(i, j):
-      # Track which variables were used to create each output in the result array
-      row_indices = range(i * self_shape[-1], (i + 1) * self_shape[-1])
-      col_indices = range(j, len(other_flat), other_shape[-1])
-      children = [self_flat[r] for r in row_indices] + [other_flat[c] for c in col_indices]
+    result = []
+    for i in range(self_shape[0]):
+      result_row = []
       
-      # Convert to Variable
-      var = Variable(result_array[i, j], _children=children)
-      
-      # Define backward for the variable, based on matrix multiplication
-      def _backward():
-        grad_output = var.grad
+      for j in range(other_shape[1]):
+        sum_product = Variable(0.)
+        
         for k in range(self_shape[-1]):
-          children[k].grad += grad_output * other_array[k, j]
-        for k in range(other_shape[-2]):
-          children[self_shape[-1] + k].grad += grad_output * self_array[i, k]
+          sum_product = sum_product + (self.data[i][k] * other.data[k][j])
+        result_row.append(sum_product)
+      result.append(result_row)
 
-      var._backward = _backward
-      return var
-
-    result_tensor = Tensor([[build_variable(i, j) for j in range(result_array.shape[1])]
-                            for i in range(result_array.shape[0])])
-    return result_tensor
+    return Tensor(result)
   
   # Reshaping operations
   def flatten(self):

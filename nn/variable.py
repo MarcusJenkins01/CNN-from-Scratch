@@ -1,8 +1,10 @@
-import numpy as np
+import math
+from collections import deque
 
 
 class Variable:
-  def __init__(self, data, _children=(), _backward=lambda: None):
+  def __init__(self, data, _children=(), _backward=None):
+    assert not isinstance(data, Variable), "Variable.data must be a number"
     self.data = data
     self.grad = 0.
     self._backward = _backward
@@ -31,35 +33,47 @@ class Variable:
     return out
 
   def backward(self):
-    from collections import deque
-    in_degree = {}
-    for node in self._descendents:
-      in_degree[node] = in_degree.get(node, 0) + 1
-    
-    queue = deque([v for v in self._descendents if in_degree.get(v, 0) == 0])
-    result = []
-    while queue:
-      node = queue.popleft()
-      result.append(node)
-      for successor in node._descendents:
-        in_degree[successor] -= 1
-        if in_degree[successor] == 0:
-          queue.append(successor)
-    
-    self.grad = np.array(1.0)
-    for node in reversed(result):
-      node._backward()
+    topo = []
+    visited = set()
+    stack = [self]
+
+    while stack:
+      v = stack.pop()
+      if v not in visited:
+        visited.add(v)
+        topo.append(v)
+        stack.extend(v._descendents)
+
+    self.grad = 1.0
+    for v in reversed(topo):
+      if v._backward is not None:
+        v._backward()
   
   def __pow__(self, other):
-    out = Variable(self.data**other, [self])
+    other = other if isinstance(other, Variable) else Variable(other)
+    out = Variable(self.data**other.data, [self, other])
     
     def _backward():
-      self.grad += (other * self.data**(other-1)) * out.grad
+      self.grad += (other.data * self.data**(other.data - 1)) * out.grad
+      other.grad += (self.data ** other.data * math.log(self.data)) * out.grad
     out._backward = _backward
     
     return out
   
-  def relu(self, other=None):
+  def log(self):
+    if self.data <= 0:
+      raise ValueError("Logarithm undefined for non-positive values")
+
+    out = Variable(math.log(self.data), [self])
+
+    def _backward():
+      if self.data != 0:
+        self.grad += out.grad / self.data
+    out._backward = _backward
+    
+    return out
+  
+  def relu(self):
     out = Variable(0 if self.data < 0 else self.data, [self])
     
     def _backward():
@@ -68,26 +82,35 @@ class Variable:
 
     return out
   
+  def exp(self):
+    out = Variable(math.exp(self.data), [self])
+
+    def _backward():
+      self.grad += out.grad * math.exp(self.data)
+    out._backward = _backward
+
+    return out
+  
   def __truediv__(self, other):
-      return self * other**-1
+    return self * other**-1
   
   def __sub__(self, other):
-      return self + (-other)
+    return self + (-other)
   
   def __neg__(self):
-        return self * -1
+      return self * -1
 
   def __rmul__(self, other):
-      return self * other
+    return self * other
   
   def __radd__(self, other):
-      return self + other
+    return self + other
 
   def __rtruediv__(self, other):
-      return other * self**-1
+    return other * self**-1
   
   def __rsub__(self, other):
-      return other + (-self)
+    return other + (-self)
 
   def __repr__(self):
-      return f"Variable(data={self.data}, grad={self.grad}, children={self._descendents})"
+    return f"Variable(data={self.data}, grad={self.grad})"
